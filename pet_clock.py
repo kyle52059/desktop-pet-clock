@@ -980,6 +980,18 @@ class PetClockApp:
         
         menu.addSeparator()
         
+        # 开机自启
+        self.autostart_action = QAction("🚀 开机自启", menu)
+        self.autostart_action.setCheckable(True)
+        try:
+            self.autostart_action.setChecked(is_autostart_enabled())
+        except:
+            pass
+        self.autostart_action.triggered.connect(self.toggle_autostart)
+        menu.addAction(self.autostart_action)
+        
+        menu.addSeparator()
+        
         quit_action = QAction("❌ 退出", menu)
         quit_action.triggered.connect(self.quit_app)
         menu.addAction(quit_action)
@@ -1010,6 +1022,16 @@ class PetClockApp:
         self.tray.hide()
         self.app.quit()
         
+    def toggle_autostart(self):
+        enabled = self.autostart_action.isChecked()
+        try:
+            set_autostart(enabled)
+            status = "已开启" if enabled else "已关闭"
+            self.tray.showMessage("🧽 海绵宝宝", f"开机自启{status}", QSystemTrayIcon.Information, 2000)
+        except Exception as e:
+            self.tray.showMessage("🧽 海绵宝宝", f"设置失败: {e}", QSystemTrayIcon.Warning, 2000)
+            self.autostart_action.setChecked(not enabled)
+    
     def run(self):
         return self.app.exec_()
 
@@ -1017,3 +1039,37 @@ class PetClockApp:
 if __name__ == '__main__':
     app = PetClockApp()
     sys.exit(app.run())
+
+
+# ===== 开机自启功能 =====
+import winreg
+import sys
+
+def is_autostart_enabled():
+    """检查是否已设置开机自启"""
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, 
+                            r"Software\Microsoft\Windows\CurrentVersion\Run", 
+                            0, winreg.KEY_READ)
+        winreg.QueryValueEx(key, "SpongeBobPet")
+        winreg.CloseKey(key)
+        return True
+    except:
+        return False
+
+def set_autostart(enable=True):
+    """设置/取消开机自启"""
+    key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                        r"Software\Microsoft\Windows\CurrentVersion\Run",
+                        0, winreg.KEY_SET_VALUE)
+    if enable:
+        # 获取当前脚本路径
+        app_path = sys.executable if getattr(sys, 'frozen', False) else f'pythonw "{os.path.abspath(__file__)}"'
+        winreg.SetValueEx(key, "SpongeBobPet", 0, winreg.REG_SZ, app_path)
+    else:
+        try:
+            winreg.DeleteValue(key, "SpongeBobPet")
+        except:
+            pass
+    winreg.CloseKey(key)
+    return enable
